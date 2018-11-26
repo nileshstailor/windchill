@@ -1,0 +1,59 @@
+#  Default properties used by the Ant build file (build.xml).  These values can
+#  be overridden by creating a build.properties file.  Properties found there
+#  will be used instead of these default values.
+
+# Windchill installation dir on remote linux machine or local installation
+windchillHome=${windchill.linux.home}
+
+# Home of Core customizations.
+projectHome=..
+
+# By default, use the local wtLib jars for compiling
+alwaysCompileAgainstWtLibDir=true
+
+# Full path to user based customizations.  (Uncomment/override to take effect. e.g. C:/workspace/R101_ePLM)  
+# customProjectHome=
+
+# Code base staging area 
+buildDir=${projectHome}/target
+
+# Default source directory
+srcDir=${projectHome}/src
+
+# Default tests (JUnit/Selenium) source directory
+testDir=${projectHome}/test
+
+# Default Windchill libraries for build only. Not for delivery. 
+wtLibDir=${projectHome}/wtLib
+
+# Default directory for java docs
+javadocDir=${projectHome}/docs
+
+# Release archive file name
+releaseFile=${projectHome}/release.jar
+
+# Remote Windchill home
+windchill.linux.home=/appl/windchill10/Windchill/
+# Remote Windchill host
+windchill.host=dev101.windchillserver.com
+# Remote Windchill user name 
+windchill.host.user=wcadmin
+# Remote Windchill user password 
+windchill.host.password=wcadmin
+
+# Jar file name for customizations
+deploymentJarFileName=wtCustom.jar
+
+# Compiler 			TODO:remove this property
+build.compiler=extJavac
+# CVS user name  	TODO:remove this property
+cvs.username=nobody
+
+
+# test.selenium.display tells JUnit/Selenium on which display the Firefox should be running
+test.selenium.display=localhost:9.0 
+
+# test.selenium.firefoxBin identifies a fully qualified path or alias to Ffirefox binary.
+# For Linux use /appl/firefox/firefox 
+# For Windows leave blank   
+test.selenium.firefoxBin=
