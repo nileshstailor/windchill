@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="Windchill 10.1" default="" basedir=".">
+
+  <tstamp>
+	   <format property="time" pattern="MM/dd/yyyy MM:hh aa" offset="-1" unit="day"/> 
+  </tstamp> 
+	
+  <property name="log.file" value="./build.log"/>
+	
+  <!-- Define global properties. -->
+  <property file="build.properties"/>
+
+  <!-- Define global properties. -->
+  <property file="build.properties.default"/>
+	
+  <path id="projectHome_classpath">
+  	 <fileset dir="${projectHome}/build/lib/" erroronmissingdir="false">
+  	 	<exclude name="selenium-server-standalone-2.24.1.jar"/>
+  	 </fileset>
+  	 <fileset dir="${projectHome}/codebase/WEB-INF/lib/" erroronmissingdir="false"></fileset>
+  </path>
+  
+  <path id="windchillHome_classpath">
+    <path refid="projectHome_classpath"/>
+
+    <!-- Compile against the class files and jars in the Windchill directory. -->
+    <pathelement location="${windchillHome}\codebase" />
+    <pathelement location="${windchillHome}\codebase\lib\log4j.jar" />
+    <pathelement location="${windchillHome}\codebase\WEB-INF\lib\ie3rdpartylibs.jar" />
+    <pathelement location="${windchillHome}\codebase\WEB-INF\lib\wc3rdpartylibs.jar" />
+    <pathelement location="${windchillHome}\codebase\WEB-INF\lib\wncWeb.jar" />
+    <pathelement location="${windchillHome}\lib\servlet.jar" />
+  </path>
+  
+  <path id="wtLibDir_classpath">
+    <path refid="projectHome_classpath"/>
+  	 <fileset dir="${wtLibDir}">
+  	   <include name="**/*.jar"/>
+  	 </fileset>
+  </path>
+  
+  <target name="_chooseCompileClasspath">
+    <!-- If windchillHome directory exists, compile against it.  Otherwise,
+         compile against the jars in wtLibDir. -->
+    <condition property="compileClasspath" value="windchillHome_classpath" else="wtLibDir_classpath">
+      <and>
+        <available file="${windchillHome}" type="dir"/>
+        <isfalse value="${alwaysCompileAgainstWtLibDir}"/>
+      </and>
+    </condition>
+    <echo message="Compiling using classpath ${compileClasspath}."/>
+  </target>
+  
+  <target name="compile" description="Compiles all source files." depends="_chooseCompileClasspath" unless="${do.not.perform}">
+  	<!-- Create target directory -->
+	<mkdir dir="${buildDir}/codebase"/>
+  	
+    <!-- Compile source classes. -->
+    <javac srcdir="${srcDir}" 
+           destdir="${buildDir}/codebase"
+           classpathref="${compileClasspath}"
+           deprecation="off"
+           debug="on"
+    	   target="1.6"    	
+           includeantruntime="false">
+    </javac>
+    
+    <!-- Copy non-java files from src to codebase for deployment. -->
+    <copy todir="${buildDir}/codebase" overwrite="${force.overwrite}">
+      <fileset dir="${projectHome}/src">
+        <exclude name="**/*.cat"/>
+        <exclude name="**/*.java"/>
+        <exclude name="**/*.mData"/>
+        <exclude name="**/*.rbInfo"/>
+      </fileset>
+    </copy>
+  </target>
+	
+  <target name="copyContent" description="Copy non-java content to target." depends="_chooseCompileClasspath"  unless="${do.not.perform}">
+    <!-- Copy non-java content to target. -->
+     <copy todir="${buildDir}/codebase" overwrite="${force.overwrite}" preservelastmodified="yes" verbose="true">
+       <fileset dir="${projectHome}/codebase">
+       	<exclude name="**/*.cat"/>
+         <exclude name="**/*.java"/>
+         <exclude name="**/*.mData"/>
+       	<exclude name="**/*.rbInfo"/>
+       </fileset>
+     </copy>
+  </target>		
+
+  <target name="copyContentForToday" description="Copy non-java content to target." depends="_chooseCompileClasspath"  unless="${do.not.perform}">
+    <!-- Copy non-java content to target. -->
+    <copy todir="${buildDir}/codebase" overwrite="${force.overwrite}" preservelastmodified="yes" verbose="true">
+      <fileset dir="${projectHome}/codebase">
+        <exclude name="**/*.cat"/>
+        <exclude name="**/*.java"/>
+        <exclude name="**/*.mData"/>
+     	  <exclude name="**/*.rbInfo"/>
+     	  <date datetime="${time}" when="after"/>
+      </fileset>
+    </copy>
+  </target>		
+	
+  <target name="copyNonCompiledContent" description="Copy non-compiled content to target.">
+	<!-- Copy non-java content to target. -->	
+  	<copy todir="${buildDir}" verbose="true" overwrite="${force.overwrite}">
+  	  <fileset dir="${projectHome}">
+       <include name="*.xconf"/>
+       <include name="codebase/config/**"/>
+       <include name="codebase/**/*.jsp"/>
+       <include name="db/**"/>
+       <include name="loadFiles/**"/>
+       <include name="loadXMLFiles/**"/>
+       <include name="Module/**"/>
+       <include name="src/**/*.rbInfo"/>
+       <include name="tasks/**/*.xml"/>
+       <include name="wtCustom/**"/>
+  	  </fileset>
+  	</copy>
+  </target>
+  	
+     	
+  <target name="compileTests" description="Compile and add tests to the target directory." depends="_chooseCompileClasspath"  unless="${do.not.perform}"> 
+	<!-- Create target directory -->
+	<mkdir dir="${buildDir}/codebase"/>
+	<!-- Compile test classes. -->
+  	<javac srcdir="${testDir}"
+  	       destdir="${buildDir}/codebase"
+  	       classpathref="${compileClasspath}"
+  	       deprecation="on"
+  	       debug="on"
+           includeantruntime="no"/>
+
+  	<!-- Copy non-java files from test to codebase for deployment. -->
+  	<copy todir="${buildDir}/codebase">
+  	  <fileset dir="${projectHome}/test">
+  	    <exclude name="**/*.java"/>
+  	  </fileset>
+  	</copy>
+  </target>
+
+  <target name="clean" description="Deletes all compiled code and directory.">
+    <delete dir="${buildDir}" failonerror="no"/>
+  </target>
+
+  <target name="build" description="Compiles java and copies non-java content for deployment" depends="compile, copyContent, copyNonCompiledContent, compileTests"/>
+  	
+  <target name="buildWithCustom" description="Compiles java and copies non-java content from core project as well as specified custom project" depends="build">
+  	
+  	<!-- Compile java sources from custom project into staging area of main project. Force overwrite because timestamp might be in past. -->
+  	<property name="do.not.compile" value="true"/>
+  	<available file="${customProjectHome}/src" type="dir" value="false" property="do.not.compile" ></available>
+  	<antcall target="compile" description="Compile custom code from ${customProjectHome} into target directory.">
+  		<param name="srcDir" value="${customProjectHome}/src"/>
+  		<param name="projectHome" value="${customProjectHome}"/>
+  		<param name="do.not.perform" value="${do.not.compile}"/>
+  		<param name="force.overwrite" value="true"/>
+  	</antcall> 
+  			
+  	<!-- Copy non java files from codebase folder of custom project into staging area of main project. Force overwrite because timestamp might be in past.  -->		
+  	<property name="do.not.copy" value="true"/>
+  	<available file="${customProjectHome}/codebase" type="dir" value="false" property="do.not.copy"></available>
+	<antcall target="copyContent" description="Copy custom content from ${customProjectHome} into target directory.">
+  		<param name="projectHome" value="${customProjectHome}"/>
+  		<param name="do.not.perform" value="${do.not.copy}"/>
+		<param name="force.overwrite" value="true"/>
+  	</antcall>
+  	
+  	<!-- Compile JUnit/Selenium tests from custom project into staging area of main project -->	
+  	<property name="do.not.compile.tests" value="true"/>
+	<available file="${customProjectHome}/test" type="dir" value="false" property="do.not.compile.tests"></available>	
+	<antcall target="compileTests" description="Copy custom tests from ${customProjectHome} into target directory.">
+  		<param name="projectHome" value="${customProjectHome}"/>
+		<param name="testDir" value="${customProjectHome}/test"/>
+		<param name="do.not.perform" value="${do.not.compile.tests}"/>
+  	</antcall>
+  	
+  	<!-- Copy non java files from custom project into staging area of main project.  Force overwrite because timestamp might be in past. -->	
+  	<antcall target="copyNonCompiledContent" description="Copy non java content to target directory.">
+  		<param name="projectHome" value="${customProjectHome}"/>
+  		<param name="force.overwrite" value="true"/>
+  	</antcall>
+  </target>
+  	
+  <target name="offlineTests" description="Runs offline tests." depends="_chooseCompileClasspath">
+  	<mkdir dir="../target/test-reports/"/>
+  	<path id="testingClasspath">
+  	  <path refid="${compileClasspath}"/>
+  	  <pathelement location="${buildDir}/codebase" />
+  	</path>
+  	
+    <junit fork="yes" printsummary="yes">
+      <test name="nic.windchill.test.OfflineTests" todir="../target/test-reports/"/>
+      <classpath refid="testingClasspath"/>
+      <formatter type="xml"/>
+    </junit>
+  </target>
+   
+ <!-- Print path manually -->
+<target name="print-path-manually" description="" >
+    <path id="example.path">
+      <fileset dir="${projectHome}/target">
+    	<include name="codebase/**"/>
+    	<date datetime="${time}" when="after"/>
+      </fileset>
+    </path>
+
+    <!-- Format path -->
+    <pathconvert pathsep="${line.separator}|   |-- "             
+        property="echo.path.compile"             
+        refid="example.path">
+    </pathconvert>
+    <echo>${echo.path.compile}</echo>
+</target>
+ 
+  	
+  <target name="deploy" description="Copies only 'codebase' files to the Windchill directory." depends="copyContent">
+    <copy todir="${windchillHome}" verbose="true">
+      <fileset dir="${projectHome}/target">
+    	<include name="codebase/**"/>	
+      </fileset>
+    </copy>
+  </target>
+	
+  <target name="deployForToday" description="Copies only 'codebase' files to the Windchill directory." depends="copyContentForToday">
+    <copy todir="${windchillHome}" verbose="true">
+      <fileset dir="${projectHome}/target">
+    	<date datetime="${time}" when="after"/>
+    	<include name="codebase/**"/>	
+      </fileset>
+    </copy>
+  </target>	
+	
+  <target name="deployAll" description="Copies all files from stage to the Windchill directory.">
+    <copy todir="${windchillHome}" verbose="true">
+      <fileset dir="${projectHome}/target">
+    	<include name="*/**"/>
+      </fileset>
+    </copy>
+  </target>	
+	
+  <target name="deployRemote" description="Copies output files to the Windchill directory.">
+	<scp todir="${windchill.host.user}:${windchill.host.password}@${windchill.host}:${windchill.linux.home}" trust="true" verbose="true">
+  	  <fileset dir="${projectHome}/target">
+  	  	<include name="*/**"/>
+  	  </fileset>
+  	</scp>
+  </target>	
+
+  <target name="buildAndDeploy" description="Builds and copies output files to the Windchill directory on VM." depends="build, copyContent, deploy"/>
+	
+  <target name="package" description="Creates a deployment jar file." depends="">
+  	<mkdir dir="${projectHome}/build/artifacts"/>
+    <delete file="${projectHome}/build/artifacts/${deploymentJarFileName}"/>
+    <jar destfile="${projectHome}/build/artifacts/${deploymentJarFileName}">
+      <fileset dir="${projectHome}/target"/>	
+    </jar>
+  </target>
+
+  <target name="packagewtLibraries" description="Packages the Windchill codebase into a set of JAR files which can be used as project libraries to improve Eclipse performance.">
+    <mkdir dir="${wtLibDir}"/>
+
+    <!-- Package the windchill codebase up into three manageable chunks. -->
+    <delete file="${wtLibDir}/com.jar"/>
+    <jar destfile="${wtLibDir}/com.jar">
+      <fileset dir="${windchillHome}/codebase">
+        <include name="com/**/*.class"/>
+      </fileset>
+    </jar>
+
+    <delete file="${wtLibDir}/wt_clients.jar"/>
+    <jar destfile="${wtLibDir}/wt_clients.jar">
+      <fileset dir="${windchillHome}/codebase">
+        <include name="wt/clients/**/*.class"/>
+      </fileset>
+    </jar>
+
+    <delete file="${wtLibDir}/wt.jar"/>
+    <jar destfile="${wtLibDir}/wt.jar">
+      <fileset dir="${windchillHome}/codebase">
+        <exclude name="wt/clients/**/*"/>
+        <include name="wt/**/*.class"/>
+      </fileset>
+    </jar>
+  	
+  	 	
+    <!-- Copy essential libraries from the Windchill directory. -->
+    <copy todir="${wtLibDir}">
+      <fileset dir="${windchillHome}">
+      	<include name="codebase/lib/log4j.jar" />
+		<include name="lib/servlet.jar" />
+		<include name="lib/endorsed/webservices-api.jar" />
+		<include name="srclib/tool/Annotations.jar" />
+		<include name="lib/pdml.jar" />
+		<include name="lib/pjl.jar" />
+		<include name="lib/wnc.jar" />
+		<include name="codebase/WEB-INF/lib/CounterPartWeb.jar" />
+		<include name="codebase/WEB-INF/lib/Gantt.jar" />
+		<include name="codebase/WEB-INF/lib/ProjectManagement.jar" />
+		<include name="codebase/WEB-INF/lib/archiveClientWeb.jar" />
+		<include name="codebase/WEB-INF/lib/archiveServerWeb.jar" />
+		<include name="codebase/WEB-INF/lib/archiveWeb.jar" />
+		<include name="codebase/WEB-INF/lib/dpimplWeb.jar" />
+		<include name="codebase/WEB-INF/lib/dpinfraWeb.jar" />
+		<include name="codebase/WEB-INF/lib/ie3rdpartylibs.jar" />
+		<include name="codebase/WEB-INF/lib/ieWeb.jar" />
+		<include name="codebase/WEB-INF/lib/install.jar" />
+		<include name="codebase/WEB-INF/lib/jmxcoreWeb.jar" />
+		<include name="codebase/WEB-INF/lib/jviews-chart-all.jar" />
+		<include name="codebase/WEB-INF/lib/jviews-framework-all.jar" />
+		<include name="codebase/WEB-INF/lib/jviews-gantt-all.jar" />
+		<include name="codebase/WEB-INF/lib/mylyn-integration.jar" />
+		<include name="codebase/WEB-INF/lib/pdmlWeb.jar" />
+		<include name="codebase/WEB-INF/lib/pjlWeb.jar" />
+		<include name="codebase/WEB-INF/lib/prowtWeb.jar" />
+		<include name="codebase/WEB-INF/lib/wc3rdpartylibs.jar" />
+		<include name="codebase/WEB-INF/lib/wncWeb.jar" />
+      </fileset>
+    </copy>
+  </target>
+	
+  <target name="packagewtLibrariesRemote" description="Remotely packages the Windchill codebase into a set of JAR files which can be used as project libraries to improve Eclipse performance.">
+  	<description>This target uses sshexec and scp tasks contributed by JCraft. Copy JCraft jar file (jsch-0.1.46.jar) into 
+  		ant_home/lib directory or link it in Eclipse ant configuration. JCraft - http://www.jcraft.com/jsch/index.html
+	</description>
+  	<property name="windchillLinuxHome" value="${windchill.host.user}:${windchill.host.password}@${windchill.host}:${windchill.linux.home}"/>
+  	<sshexec host="${windchill.host}" username="${windchill.host.user}" password="${windchill.host.password}" trust="true" command="rm -f ~/com.jar com; rm -f ~/wt.jar com >> ${log.file}"/>
+  	<sshexec host="${windchill.host}" username="${windchill.host.user}" password="${windchill.host.password}" trust="true" command="cd ${windchill.linux.home}codebase; /usr/java1.6/bin/jar cfv ~/com.jar com; exit 0; >> ${log.file}" timeout="600000"/>
+  	<sshexec host="${windchill.host}" username="${windchill.host.user}" password="${windchill.host.password}" trust="true" command="cd ${windchill.linux.home}codebase; /usr/java1.6/bin/jar cfv ~/wt.jar wt; exit 0; >> ${log.file}" timeout="600000" />
+  	<delete dir="${wtLibDir}" description="Delete ${wtLibDir} directory as a clean up."/> 
+  	<mkdir dir="${wtLibDir}" description="Make a ${wtLibDir} directory for Windchill jar files."/>
+  	<scp todir="${wtLibDir}" trust="true" file="${windchill.host.user}:${windchill.host.password}@${windchill.host}:~/com.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchill.host.user}:${windchill.host.password}@${windchill.host}:~/wt.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/lib/log4j.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}lib/servlet.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}lib/endorsed/webservices-api.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}srclib/tool/Annotations.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}lib/pdml.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}lib/pjl.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}lib/wnc.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/CounterPartWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/Gantt.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/ProjectManagement.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/archiveClientWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/archiveServerWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/archiveWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/dpimplWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/dpinfraWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/ie3rdpartylibs.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/ieWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/install.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/jmxcoreWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/jviews-chart-all.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/jviews-framework-all.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/jviews-gantt-all.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/mylyn-integration.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/pdmlWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/pjlWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/prowtWeb.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/wc3rdpartylibs.jar" />
+  	<scp todir="${wtLibDir}" trust="true" file="${windchillLinuxHome}codebase/WEB-INF/lib/wncWeb.jar" />
+  </target>
+	
+  <target name="wtStopRemote" description="Stop remote Windchill instance.">
+  	<echo message="Stopping Windchill on ${windchill.host}" />
+  	<sshexec host="${windchill.host}" username="${windchill.host.user}" password="${windchill.host.password}"  trust="true" command="source .profile; PATH=/usr/java1.6/bin:$PATH; export PATH; $WT_HOME/bin/windchill stop" failonerror="false"/>
+  </target>
+	
+  <target name="wtStartRemote" description="Start remote Windchill instance.">
+  	<echo message="Starting Windchill on ${windchill.host}" />
+  	<sshexec host="${windchill.host}" username="${windchill.host.user}" password="${windchill.host.password}"  trust="true" command="source .profile; PATH=/usr/java1.6/bin:$PATH; export PATH; $WT_HOME/bin/windchill start" failonerror="false"/>
+  </target>
+  
+  <target name="wtRestart" description="Restart remote Windchill instance." depends="wtStopRemote, wtStartRemote"/>
+
+  <target name="compileDeployRestart" description="Compile classes and deploy followed by a restart of remote Windchill instance." depends="compile,deploy,wtStopRemote, wtStartRemote"/>
+
+  <target name="compileDeployRestartForToday" description="Compile classes and deploy followed by a restart of remote Windchill instance." depends="compile,deployForToday,wtStopRemote, wtStartRemote"/>
+	
+  <target name="testRunSelenium" depends="compileTests" description="Run integration/acceptance tests using Selenium.
+  		The following parameters can be specified: 
+	  		test.selenium.firefoxBin=/appl/firefox/firefox 	- identify Firefox binary location
+	  		test.selenium.display=localhost:9.0				- linux display where Firefox will be running">
+
+  	<mkdir dir="${buildDir}/test-reports" description="Create directory for test reports."/>
+  	<condition 	property="env.message"
+  				value="Starting Selenium unit tests on $DISPLAY=${test.selenium.display}, using Firefox binary located at ${test.selenium.firefoxBin}"
+  		 		else="Starting Selenium unit tests.">  
+		<os family="unix"/>
+	</condition>
+  	<condition 	property="junit.vmargs" 
+  				value="-Dwebdriver.firefox.bin=${test.selenium.firefoxBin}"
+  				else="">
+  		<length string="${test.selenium.firefoxBin}" when="greater" trim="true" length="0" />	
+  	</condition>
+
+  	<echo message="${env.message}"></echo>
+  	<junit printsummary="yes" haltonfailure="no" fork="true">
+	  <jvmarg line="${junit.vmargs}"/>
+	  <env key="DISPLAY" value="${test.selenium.display}"/>
+  	  <sysproperty key="java.util.logging.config.file" value="../test/test_logger.properties"/>
+  		
+	  <classpath>
+	  	<pathelement path="${buildDir}/codebase"/>	
+		<fileset dir="${projectHome}/build/lib">  
+		  <include name="**/*.jar"/>  
+		</fileset>  
+	  </classpath>
+	  	
+	  <test name="nic.windchill.selenium.suites.ElementCreationSuite" haltonfailure="no" todir="../target/test-reports">   
+		<formatter type="xml"/>  
+	  </test>  
+  	  <test name="nic.windchill.selenium.suites.CustomizationTestSuite" haltonfailure="no" todir="../target/test-reports">   
+  		<formatter type="xml"/> 
+  	  </test>  
+	</junit>  
+  </target>  
+</project>
